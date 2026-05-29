@@ -1,0 +1,73 @@
+# ============================================================
+# Threat Intelligence RAG Chatbot — .gitignore
+# ============================================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# --- Virtual Environment ---
+venv/
+.venv/
+env/
+.env
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Streamlit ---
+.streamlit/secrets.toml
+
+# --- Data (keep structure, ignore content) ---
+data/raw/feeds/*.pdf
+data/raw/feeds/*.json
+data/raw/feeds/*.csv
+data/raw/reports/*.pdf
+data/raw/reports/*.docx
+data/raw/reports/*.txt
+data/processed/*.json
+data/processed/*.pkl
+data/processed/*.parquet
+!data/**/.gitkeep
+
+# --- Model Cache ---
+models/
+*.bin
+*.pt
+*.onnx
+*.safetensors
+
+# --- Logs ---
+logs/
+*.log
+
+# --- Testing ---
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# --- ChromaDB (future) ---
+chroma_db/
+*.sqlite3
+
+# --- Misc ---
+.ruff_cache/
+*.bak
+*.tmp
