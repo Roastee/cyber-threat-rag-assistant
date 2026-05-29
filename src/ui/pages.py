@@ -21,6 +21,8 @@ def render_documents_page() -> None:
     _render_upload_section()
     st.markdown('<div class="cyber-divider"></div>', unsafe_allow_html=True)
     _render_document_list()
+    st.markdown('<div class="cyber-divider"></div>', unsafe_allow_html=True)
+    _render_vectordb_status()
 
 
 # ── Documents Page: Sub-components ───────────────────────────
@@ -90,11 +92,16 @@ def _render_stats_dashboard() -> None:
             unsafe_allow_html=True,
         )
     with col5:
-        total_embeddings = state_manager.get_total_embedding_count()
+        from src.vectorstore import collection_manager
+        try:
+            coll_stats = collection_manager.get_collection_stats()
+            indexed_total = coll_stats.total_vectors
+        except Exception:
+            indexed_total = 0
         st.markdown(
             '<div class="metric-card">'
-            f'<div class="metric-value" style="color: #F59E0B;">{total_embeddings}</div>'
-            '<div class="metric-label">Embeddings</div>'
+            f'<div class="metric-value" style="color: #F59E0B;">{indexed_total}</div>'
+            '<div class="metric-label">Indexed</div>'
             "</div>",
             unsafe_allow_html=True,
         )
@@ -145,10 +152,11 @@ def _render_upload_section() -> None:
                 doc = result.document
                 chunk_info = f", {result.chunk_count} chunks" if result.chunk_count else ""
                 emb_info = f", {result.embedding_count} embeddings" if result.embedding_count else ""
+                idx_info = f", {result.indexed_count} indexed" if result.indexed_count else ""
                 st.success(
                     f"✅ **{doc.filename}** — "
                     f"{doc.page_count} pages, "
-                    f"{doc.word_count:,} words{chunk_info}{emb_info}, "
+                    f"{doc.word_count:,} words{chunk_info}{emb_info}{idx_info}, "
                     f"{doc.file_size_display}"
                 )
                 if doc.status == "partial":
@@ -218,6 +226,9 @@ def _render_document_list() -> None:
                 key=f"del_{doc.doc_id}",
                 use_container_width=True,
             ):
+                # Clean up: session state + ChromaDB
+                from src.vectorstore import indexing_pipeline as idx_pipe
+                idx_pipe.remove_document(doc.doc_id)
                 state_manager.remove_ingested_doc(doc.doc_id)
                 state_manager.clear_chunks(doc.doc_id)
                 state_manager.clear_embeddings(doc.doc_id)
@@ -267,6 +278,62 @@ def _render_document_list() -> None:
                 if len(emb_records) > 3:
                     st.caption(f"... and {len(emb_records) - 3} more vectors.")
 
+
+def _render_vectordb_status() -> None:
+    """Render ChromaDB vector database status section."""
+    st.markdown("#### 🗄️ Vector Database")
+
+    try:
+        from src.vectorstore import collection_manager
+
+        stats = collection_manager.get_collection_stats()
+        store_info = collection_manager.get_store_info()
+
+        vc1, vc2, vc3, vc4 = st.columns(4)
+        with vc1:
+            st.markdown(
+                '<div class="metric-card">'
+                f'<div class="metric-value" style="color: #00FF88;">{stats.total_vectors}</div>'
+                '<div class="metric-label">Vectors</div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with vc2:
+            st.markdown(
+                '<div class="metric-card">'
+                f'<div class="metric-value" style="color: #00D4FF;">{stats.doc_count}</div>'
+                '<div class="metric-label">Documents</div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with vc3:
+            dims = f"{stats.dimensions}d" if stats.dimensions else "—"
+            st.markdown(
+                '<div class="metric-card">'
+                f'<div class="metric-value" style="color: #A855F7;">{dims}</div>'
+                '<div class="metric-label">Dimensions</div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with vc4:
+            st.markdown(
+                '<div class="metric-card">'
+                f'<div class="metric-value" style="color: #F59E0B;">✅</div>'
+                '<div class="metric-label">Persistent</div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+        with st.expander("🔧 ChromaDB Details", expanded=False):
+            st.markdown(f"**Collection:** `{stats.name}`")
+            st.markdown(f"**Storage:** `{store_info.persist_directory}`")
+            if stats.metadata_keys:
+                st.markdown(f"**Metadata fields:** `{', '.join(stats.metadata_keys)}`")
+            if stats.doc_ids:
+                st.markdown(f"**Document IDs:** {', '.join(f'`{d[:8]}...`' for d in stats.doc_ids)}")
+
+    except Exception as e:
+        st.warning(f"⚠️ Vector database unavailable: {e}")
 
 def _status_badge(status: str) -> str:
     """Return a colored status string."""

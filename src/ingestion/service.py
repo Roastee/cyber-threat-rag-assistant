@@ -13,9 +13,8 @@ Design Decision:
     (just file_uploader + display) while the service owns all
     business rules (validation, size limits, allowed types).
 
-    In a future sprint, this service will also:
-    - Store vectors in ChromaDB
-    But NOT today — we extract, chunk, embed, and store in session state.
+    This pipeline now covers the full path:
+    extract → chunk → embed → index into ChromaDB
 """
 
 from __future__ import annotations
@@ -30,6 +29,7 @@ from src.ingestion.pdf_loader import PDFLoader, PDFLoadError
 from src.models.document import Document
 from src.processing.pipeline import processing_pipeline, ProcessingStats
 from src.embeddings.embedding_pipeline import embedding_pipeline
+from src.vectorstore.indexing_pipeline import indexing_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,7 @@ class IngestionResult:
     error: str = ""
     chunk_count: int = 0
     embedding_count: int = 0
+    indexed_count: int = 0
     processing_stats: ProcessingStats | None = None
 
 
@@ -166,13 +167,36 @@ class IngestionService:
             except Exception as e:
                 logger.warning("Embedding error for %s (chunks still stored): %s", filename, e)
 
+        # Step 7: Index into ChromaDB
+        indexed_count = 0
+        if emb_result and emb_result.success and emb_result.records and proc_result and proc_result.chunks:
+            try:
+                idx_result = indexing_pipeline.index_document(
+                    chunks=proc_result.chunks,
+                    embedding_records=emb_result.records,
+                    doc_id=document.doc_id,
+                )
+                if idx_result.success:
+                    indexed_count = idx_result.indexed_count
+                    logger.info(
+                        "Indexed %s: %d vectors into ChromaDB (%.3fs)",
+                        filename,
+                        indexed_count,
+                        idx_result.time_secs,
+                    )
+                else:
+                    logger.warning("Indexing failed for %s: %s", filename, idx_result.error)
+            except Exception as e:
+                logger.warning("Indexing error for %s (embeddings still stored): %s", filename, e)
+
         logger.info(
-            "Ingestion complete for %s — %d pages, %d words, %d chunks, %d embeddings",
+            "Ingestion complete for %s — %d pages, %d words, %d chunks, %d embeddings, %d indexed",
             filename,
             document.page_count,
             document.word_count,
             chunk_count,
             embedding_count,
+            indexed_count,
         )
 
         return IngestionResult(
@@ -180,6 +204,7 @@ class IngestionService:
             document=document,
             chunk_count=chunk_count,
             embedding_count=embedding_count,
+            indexed_count=indexed_count,
             processing_stats=proc_stats,
         )
 

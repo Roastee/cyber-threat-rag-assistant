@@ -15,7 +15,7 @@ class AppConfig:
 
     APP_TITLE: str = "🛡️ Threat Intelligence RAG Chatbot"
     APP_ICON: str = "🛡️"
-    APP_VERSION: str = "0.4.0"
+    APP_VERSION: str = "0.5.0"
     APP_DESCRIPTION: str = (
         "AI-powered threat intelligence assistant using "
         "Retrieval-Augmented Generation."
@@ -57,6 +57,10 @@ class AppConfig:
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
     EMBEDDING_DIMENSIONS: int = 384
     EMBEDDING_BATCH_SIZE: int = 32
+
+    # --- Vector Store ---
+    CHROMA_PERSIST_DIR: str = "chroma_db"
+    CHROMA_COLLECTION_NAME: str = "threat_intel_docs"
 
     # --- Theme ---
     PRIMARY_COLOR: str = "#00FF88"
